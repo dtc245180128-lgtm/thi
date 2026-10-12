@@ -1,0 +1,107 @@
+version: '3.3'
+
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+    internal: true # Network Isolation (Hardening)
+  monitoring_net:
+    driver: bridge
+
+services:
+  # 1. Reverse Proxy
+  nginx_proxy:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - frontend_net
+      - backend_net
+
+  # 2. Web Application (Bất động sản)
+  web_app:
+    build: ./app
+    container_name: web_app
+    restart: always
+    networks:
+      - backend_net
+
+  # 3. Database (PostgreSQL)
+  database:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: bds_db
+      POSTGRES_USER: bds_user
+      POSTGRES_PASSWORD: StrongPassword123!@# # Mật khẩu mạnh
+    networks:
+      - backend_net
+
+  # 4. DB Tool (Adminer)
+  db_adminer:
+    image: adminer:latest
+    container_name: db_adminer
+    restart: always
+    networks:
+      - backend_net
+
+  # 5. Prometheus
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring_net
+
+  # 6. Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring_net
+      - backend_net
+
+  # 7. cAdvisor (Giám sát Container)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitoring_net
+
+  # 8. Loki (Log tập trung)
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring_net
+
+  # 9. Promtail (Thu thập Log)
+  promtail:
+    image: grafana/promtail:2.8.2
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - monitoring_net
