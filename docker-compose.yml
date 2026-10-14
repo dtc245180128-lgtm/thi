@@ -9,6 +9,9 @@ networks:
   monitoring_net:
     driver: bridge
 
+volumes:
+  wp_db_data:
+
 services:
   # 1. Reverse Proxy
   nginx_proxy:
@@ -105,3 +108,36 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     networks:
       - monitoring_net
+
+  # 10. Database cho WordPress (MySQL)
+  wordpress_db:
+    image: mysql:5.7
+    container_name: wordpress_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: wp_password123!
+      MYSQL_ROOT_PASSWORD: wp_root_password123!
+    volumes:
+      - wp_db_data:/var/lib/mysql
+    networks:
+      - backend_net
+
+  # 11. WordPress App
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress_app
+    restart: always
+    ports:
+      - "8085:80"
+    environment:
+      WORDPRESS_DB_HOST: wordpress_db:3306
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_password123!
+      WORDPRESS_DB_NAME: wordpress
+    depends_on:
+      - wordpress_db
+    networks:
+      - frontend_net
+      - backend_net
